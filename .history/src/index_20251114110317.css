@@ -1,0 +1,1211 @@
+i am working on gpa and cgpa calculator web page using react springboot and my sqla. thats why i want full vertion with those "✔ Admin Dashboard
+✔ Student Management Page
+✔ CGPA Calculator
+✔ History Page
+✔ Curriculum Management
+✔ Reports
+✔ Sidebar + Header
+✔ JWT validation
+✔ Protected routes" import React from 'react'
+import { useAuth } from '../../App'
+import { LogOut, Sun, Moon } from 'lucide-react'
+
+const Header = ({ darkMode, setDarkMode }) => {
+  const { user, logout } = useAuth()
+
+  const handleLogout = () => {
+    logout()
+  }
+
+  return (
+    <header className="bg-white dark:bg-gray-800 shadow-sm border-b border-gray-200 dark:border-gray-700">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex justify-between items-center h-16">
+          <div className="flex items-center">
+            <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+              GPA Calculator
+            </h1>
+            <span className="ml-4 px-3 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 text-sm rounded-full">
+              {user?.role === 'ADMIN' ? 'Admin' : 'Student'}
+            </span>
+          </div>
+          
+          <div className="flex items-center space-x-4">
+            <button
+              onClick={() => setDarkMode(!darkMode)}
+              className="p-2 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              {darkMode ? <Sun size={20} /> : <Moon size={20} />}
+            </button>
+            
+            <div className="flex items-center space-x-3">
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Welcome, {user?.name}
+              </span>
+              <button
+                onClick={handleLogout}
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900 rounded-md"
+              >
+                <LogOut size={16} />
+                <span>Logout</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </header>
+  )
+}
+
+export default Header"."import React from 'react'
+import { Link, useLocation } from 'react-router-dom'
+import { useAuth } from '../../App'
+import { 
+  LayoutDashboard, 
+  Calculator, 
+  Users, 
+  BookOpen, 
+  History as HistoryIcon,
+  FileText,
+  BarChart3
+} from 'lucide-react'
+
+const Sidebar = () => {
+  const { user } = useAuth()
+  const location = useLocation()
+
+  const studentMenu = [
+    { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/gpa', icon: Calculator, label: 'GPA Calculator' },
+    { path: '/cgpa', icon: BarChart3, label: 'CGPA Calculator' },
+    { path: '/history', icon: HistoryIcon, label: 'History' },
+  ]
+
+  const adminMenu = [
+    { path: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
+    { path: '/admin/students', icon: Users, label: 'Student Management' },
+    { path: '/admin/curriculum', icon: BookOpen, label: 'Curriculum Management' },
+    { path: '/admin/reports', icon: FileText, label: 'Reports' },
+  ]
+
+  const menuItems = user?.role === 'ADMIN' ? adminMenu : studentMenu
+
+  const isActive = (path) => {
+    if (path === '/dashboard' || path === '/admin') {
+      return location.pathname === path
+    }
+    return location.pathname.startsWith(path)
+  }
+
+  return (
+    <aside className="w-64 bg-white dark:bg-gray-800 shadow-sm border-r border-gray-200 dark:border-gray-700">
+      <nav className="mt-8">
+        <ul className="space-y-2 px-4">
+          {menuItems.map((item) => {
+            const Icon = item.icon
+            return (
+              <li key={item.path}>
+                <Link
+                  to={item.path}
+                  className={`flex items-center space-x-3 px-3 py-3 rounded-lg text-sm font-medium transition-colors ${
+                    isActive(item.path)
+                      ? 'bg-blue-50 dark:bg-blue-900 text-blue-700 dark:text-blue-200 border-r-2 border-blue-600'
+                      : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-700'
+                  }`}
+                >
+                  <Icon size={18} />
+                  <span>{item.label}</span>
+                </Link>
+              </li>
+            )
+          })}
+        </ul>
+      </nav>
+    </aside>
+  )
+}
+
+export default Sidebar","import React, { useState, useEffect } from 'react'
+import { useAuth } from '../App'
+import { studentAPI } from '../services/api'
+import { GRADE_OPTIONS, SEMESTERS } from '../utils/constants'
+import { toast } from 'react-toastify'
+import Header from '../components/Layout/Header'
+import Sidebar from '../components/Layout/Sidebar'
+import { Save, Download, Calculator, Search } from 'lucide-react'
+
+const GPACalculator = () => {
+  const [regulations, setRegulations] = useState([])
+  const [departments, setDepartments] = useState([])
+  const [subjects, setSubjects] = useState([])
+  const [selectedSubjects, setSelectedSubjects] = useState([])
+  const [electiveSearch, setElectiveSearch] = useState('')
+  const [filteredElectives, setFilteredElectives] = useState([])
+  const [gpaResult, setGpaResult] = useState(null)
+  
+  const [formData, setFormData] = useState({
+    regulationId: '',
+    departmentId: '',
+    semester: ''
+  })
+
+  const { user, setLoading } = useAuth()
+  const [darkMode, setDarkMode] = useState(false)
+
+  // Mock data - in real app, fetch from API
+  useEffect(() => {
+    setRegulations([
+      { id: 1, name: 'R2017', year: 2017 },
+      { id: 2, name: 'R2021', year: 2021 }
+    ])
+    setDepartments([
+      { id: 1, name: 'Computer Science Engineering', code: 'CSE' },
+      { id: 2, name: 'Information Technology', code: 'IT' }
+    ])
+  }, [])
+
+  const fetchSubjects = async () => {
+    if (!formData.regulationId || !formData.departmentId || !formData.semester) {
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await studentAPI.getSubjects(
+        formData.regulationId,
+        formData.departmentId,
+        formData.semester
+      )
+      const subjectsData = response.data
+      setSubjects(subjectsData)
+      
+      // Initialize selected subjects with empty grades
+      const initialSelected = subjectsData.map(subject => ({
+        ...subject,
+        grade: '',
+        points: 0
+      }))
+      setSelectedSubjects(initialSelected)
+    } catch (error) {
+      toast.error('Failed to fetch subjects')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    fetchSubjects()
+  }, [formData.regulationId, formData.departmentId, formData.semester])
+
+  useEffect(() => {
+    if (electiveSearch) {
+      const filtered = subjects.filter(subject =>
+        subject.isElective &&
+        (subject.code.toLowerCase().includes(electiveSearch.toLowerCase()) ||
+         subject.name.toLowerCase().includes(electiveSearch.toLowerCase()))
+      )
+      setFilteredElectives(filtered)
+    } else {
+      setFilteredElectives([])
+    }
+  }, [electiveSearch, subjects])
+
+  const handleInputChange = (field, value) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: value
+    }))
+    setGpaResult(null)
+  }
+
+  const handleGradeChange = (subjectId, grade) => {
+    setSelectedSubjects(prev =>
+      prev.map(subject =>
+        subject.id === subjectId
+          ? { ...subject, grade, points: getGradePoints(grade) }
+          : subject
+      )
+    )
+    setGpaResult(null)
+  }
+
+  const getGradePoints = (grade) => {
+    const pointsMap = {
+      'O': 10, 'A+': 9, 'A': 8, 'B+': 7, 'B': 6, 'C': 5, 'RA': 0
+    }
+    return pointsMap[grade] || 0
+  }
+
+  const calculateGPA = () => {
+    const validSubjects = selectedSubjects.filter(subject => subject.grade)
+    
+    if (validSubjects.length === 0) {
+      toast.error('Please enter grades for at least one subject')
+      return
+    }
+
+    let totalCredits = 0
+    let totalPoints = 0
+
+    validSubjects.forEach(subject => {
+      totalCredits += subject.credits
+      totalPoints += subject.points * subject.credits
+    })
+
+    const gpa = totalPoints / totalCredits
+    setGpaResult({
+      gpa: gpa.toFixed(2),
+      totalCredits,
+      totalPoints
+    })
+  }
+
+  const saveGrades = async () => {
+    if (!gpaResult) {
+      toast.error('Please calculate GPA first')
+      return
+    }
+
+    setLoading(true)
+    try {
+      await studentAPI.saveGrades({
+        semester: parseInt(formData.semester),
+        subjects: selectedSubjects.filter(subject => subject.grade)
+      })
+      toast.success('Grades saved successfully!')
+    } catch (error) {
+      toast.error('Failed to save grades')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const generatePDF = async () => {
+    if (!gpaResult) {
+      toast.error('Please calculate GPA first')
+      return
+    }
+
+    setLoading(true)
+    try {
+      const response = await studentAPI.generateMarksheet(formData.semester)
+      const blob = new Blob([response.data], { type: 'application/pdf' })
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `marksheet-semester-${formData.semester}.pdf`
+      link.click()
+      window.URL.revokeObjectURL(url)
+    } catch (error) {
+      toast.error('Failed to generate PDF')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const addElective = (elective) => {
+    if (!selectedSubjects.find(subject => subject.id === elective.id)) {
+      setSelectedSubjects(prev => [...prev, { ...elective, grade: '', points: 0 }])
+    }
+    setElectiveSearch('')
+    setFilteredElectives([])
+  }
+
+  return (
+    <div className={`min-h-screen ${darkMode ? 'dark' : ''}`}>
+      <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+      
+      <div className="flex">
+        <Sidebar />
+        
+        <main className="flex-1 p-8">
+          <div className="max-w-6xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-8">
+              GPA Calculator
+            </h1>
+
+            {/* Selection Form */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Regulation
+                  </label>
+                  <select
+                    value={formData.regulationId}
+                    onChange={(e) => handleInputChange('regulationId', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select Regulation</option>
+                    {regulations.map(reg => (
+                      <option key={reg.id} value={reg.id}>
+                        {reg.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Department
+                  </label>
+                  <select
+                    value={formData.departmentId}
+                    onChange={(e) => handleInputChange('departmentId', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Semester
+                  </label>
+                  <select
+                    value={formData.semester}
+                    onChange={(e) => handleInputChange('semester', e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                  >
+                    <option value="">Select Semester</option>
+                    {SEMESTERS.map(sem => (
+                      <option key={sem.value} value={sem.value}>
+                        {sem.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            {/* Elective Search */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+                Add Elective Subjects
+              </h3>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Search className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="text"
+                  value={electiveSearch}
+                  onChange={(e) => setElectiveSearch(e.target.value)}
+                  placeholder="Search electives by code or name..."
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                />
+              </div>
+              
+              {filteredElectives.length > 0 && (
+                <div className="mt-2 border border-gray-200 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 max-h-60 overflow-y-auto">
+                  {filteredElectives.map(elective => (
+                    <div
+                      key={elective.id}
+                      className="p-3 border-b border-gray-100 dark:border-gray-600 last:border-0 hover:bg-gray-50 dark:hover:bg-gray-600 cursor-pointer"
+                      onClick={() => addElective(elective)}
+                    >
+                      <div className="font-medium text-gray-900 dark:text-white">
+                        {elective.code}
+                      </div>
+                      <div className="text-sm text-gray-600 dark:text-gray-400">
+                        {elective.name} • {elective.credits} Credits
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Subjects Table */}
+            {selectedSubjects.length > 0 && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 overflow-hidden mb-8">
+                <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                    Subjects - Semester {formData.semester}
+                  </h3>
+                </div>
+                
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-gray-50 dark:bg-gray-700">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Subject Code
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Subject Name
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Credits
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Type
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">
+                          Grade
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-600">
+                      {selectedSubjects.map((subject) => (
+                        <tr key={subject.id} className="hover:bg-gray-50 dark:hover:bg-gray-700">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
+                            {subject.code}
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-900 dark:text-white">
+                            {subject.name}
+                            {subject.isElective && (
+                              <span className="ml-2 px-2 py-1 text-xs bg-purple-100 dark:bg-purple-900 text-purple-800 dark:text-purple-200 rounded-full">
+                                Elective
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {subject.credits}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                            {subject.type}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <select
+                              value={subject.grade}
+                              onChange={(e) => handleGradeChange(subject.id, e.target.value)}
+                              className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
+                            >
+                              <option value="">Select Grade</option>
+                              {GRADE_OPTIONS.map(option => (
+                                <option key={option.value} value={option.value}>
+                                  {option.label}
+                                </option>
+                              ))}
+                            </select>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {/* Action Buttons and Result */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+              <div className="flex space-x-4">
+                <button
+                  onClick={calculateGPA}
+                  disabled={!formData.semester}
+                  className="flex items-center space-x-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  <Calculator size={20} />
+                  <span>Calculate GPA</span>
+                </button>
+                
+                {gpaResult && (
+                  <>
+                    <button
+                      onClick={saveGrades}
+                      className="flex items-center space-x-2 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                    >
+                      <Save size={20} />
+                      <span>Save Grades</span>
+                    </button>
+                    
+                    <button
+                      onClick={generatePDF}
+                      className="flex items-center space-x-2 px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    >
+                      <Download size={20} />
+                      <span>Generate PDF</span>
+                    </button>
+                  </>
+                )}
+              </div>
+
+              {gpaResult && (
+                <div className="bg-blue-50 dark:bg-blue-900 border border-blue-200 dark:border-blue-700 rounded-lg p-6 text-center">
+                  <div className="text-3xl font-bold text-blue-600 dark:text-blue-400">
+                    {gpaResult.gpa}
+                  </div>
+                  <div className="text-sm text-blue-800 dark:text-blue-200 mt-1">
+                    GPA for Semester {formData.semester}
+                  </div>
+                  <div className="text-xs text-blue-600 dark:text-blue-300 mt-2">
+                    Total Credits: {gpaResult.totalCredits} | Total Points: {gpaResult.totalPoints}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export default GPACalculator"."import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../App'
+import { authAPI } from '../services/api'
+import { toast } from 'react-toastify'
+import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
+
+const Login = () => {
+  const [formData, setFormData] = useState({
+    email: '',
+    password: ''
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const { login, setLoading } = useAuth()
+  const navigate = useNavigate()
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setLoading(true)
+
+    try {
+      const response = await authAPI.login(formData)
+      const { user, token } = response.data
+      
+      login({ ...user, token })
+      toast.success(`Welcome back, ${user.name}!`)
+      
+      navigate(user.role === 'ADMIN' ? '/admin' : '/dashboard')
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Login failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+            Sign in to your account
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            Or{' '}
+            <Link
+              to="/register"
+              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500"
+            >
+              create a new account
+            </Link>
+          </p>
+        </div>
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="email" className="sr-only">
+                Email address
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  autoComplete="email"
+                  required
+                  value={formData.email}
+                  onChange={handleChange}
+                  className="relative block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Email address"
+                />
+              </div>
+            </div>
+            
+            <div>
+              <label htmlFor="password" className="sr-only">
+                Password
+              </label>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Lock className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  required
+                  value={formData.password}
+                  onChange={handleChange}
+                  className="relative block w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Password"
+                />
+                <button
+                  type="button"
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  onClick={() => setShowPassword(!showPassword)}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 text-gray-400" />
+                  ) : (
+                    <Eye className="h-5 w-5 text-gray-400" />
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            >
+              Sign in
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default Login"."import React, { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import { useAuth } from '../App'
+import { authAPI } from '../services/api'
+import { toast } from 'react-toastify'
+import { Eye, EyeOff, Mail, Lock, User, BookOpen } from 'lucide-react'
+
+const Register = () => {
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    regulation: '',
+    department: ''
+  })
+  const [showPassword, setShowPassword] = useState(false)
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [otpSent, setOtpSent] = useState(false)
+  const [otp, setOtp] = useState('')
+  const { setLoading } = useAuth()
+  const navigate = useNavigate()
+
+  // Mock data - in real app, fetch from API
+  const regulations = [
+    { id: 1, name: 'R2017', year: 2017 },
+    { id: 2, name: 'R2021', year: 2021 }
+  ]
+
+  const departments = [
+    { id: 1, name: 'Computer Science Engineering', code: 'CSE' },
+    { id: 2, name: 'Information Technology', code: 'IT' },
+    { id: 3, name: 'Electronics and Communication Engineering', code: 'ECE' }
+  ]
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    })
+  }
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    
+    if (formData.password !== formData.confirmPassword) {
+      toast.error('Passwords do not match')
+      return
+    }
+
+    setLoading(true)
+
+    try {
+      if (!otpSent) {
+        await authAPI.register(formData)
+        setOtpSent(true)
+        toast.success('OTP sent to your email')
+      } else {
+        await authAPI.verifyOtp(formData.email, otp)
+        toast.success('Registration successful! Please login.')
+        navigate('/login')
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Registration failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    try {
+      await authAPI.resendOtp(formData.email)
+      toast.success('OTP resent to your email')
+    } catch (error) {
+      toast.error(error.response?.data?.message || 'Failed to resend OTP')
+    }
+  }
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900 py-12 px-4 sm:px-6 lg:px-8">
+      <div className="max-w-md w-full space-y-8">
+        <div>
+          <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900 dark:text-white">
+            Create your account
+          </h2>
+          <p className="mt-2 text-center text-sm text-gray-600 dark:text-gray-400">
+            Or{' '}
+            <Link
+              to="/login"
+              className="font-medium text-blue-600 dark:text-blue-400 hover:text-blue-500"
+            >
+              sign in to existing account
+            </Link>
+          </p>
+        </div>
+        
+        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+          <div className="space-y-4">
+            {!otpSent ? (
+              <>
+                <div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <User className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      name="name"
+                      type="text"
+                      required
+                      value={formData.name}
+                      onChange={handleChange}
+                      className="relative block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Full Name"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Mail className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      name="email"
+                      type="email"
+                      required
+                      value={formData.email}
+                      onChange={handleChange}
+                      className="relative block w-full pl-10 pr-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Email address"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <select
+                    name="regulation"
+                    required
+                    value={formData.regulation}
+                    onChange={handleChange}
+                    className="block w-full pl-3 pr-10 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Regulation</option>
+                    {regulations.map(reg => (
+                      <option key={reg.id} value={reg.id}>
+                        {reg.name} ({reg.year})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <select
+                    name="department"
+                    required
+                    value={formData.department}
+                    onChange={handleChange}
+                    className="block w-full pl-3 pr-10 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  >
+                    <option value="">Select Department</option>
+                    {departments.map(dept => (
+                      <option key={dept.id} value={dept.id}>
+                        {dept.name} ({dept.code})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      value={formData.password}
+                      onChange={handleChange}
+                      className="relative block w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowPassword(!showPassword)}
+                    >
+                      {showPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                      <Lock className="h-5 w-5 text-gray-400" />
+                    </div>
+                    <input
+                      name="confirmPassword"
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      required
+                      value={formData.confirmPassword}
+                      onChange={handleChange}
+                      className="relative block w-full pl-10 pr-10 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                      placeholder="Confirm Password"
+                    />
+                    <button
+                      type="button"
+                      className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? (
+                        <EyeOff className="h-5 w-5 text-gray-400" />
+                      ) : (
+                        <Eye className="h-5 w-5 text-gray-400" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </>
+            ) : (
+              <div>
+                <label htmlFor="otp" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Enter OTP sent to your email
+                </label>
+                <input
+                  id="otp"
+                  name="otp"
+                  type="text"
+                  required
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value)}
+                  className="block w-full px-3 py-3 border border-gray-300 dark:border-gray-600 placeholder-gray-500 dark:placeholder-gray-400 text-gray-900 dark:text-white rounded-lg bg-white dark:bg-gray-800 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                  placeholder="Enter OTP"
+                />
+                <button
+                  type="button"
+                  onClick={handleResendOtp}
+                  className="mt-2 text-sm text-blue-600 dark:text-blue-400 hover:text-blue-500"
+                >
+                  Resend OTP
+                </button>
+              </div>
+            )}
+          </div>
+
+          <div>
+            <button
+              type="submit"
+              className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-lg text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-colors"
+            >
+              {otpSent ? 'Verify OTP' : 'Create Account'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+export default Register"."import React, { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { useAuth } from '../App'
+import { studentAPI } from '../services/api'
+import { Calculator, BarChart3, History as HistoryIcon, User } from 'lucide-react'
+import Header from '../components/Layout/Header'
+import Sidebar from '../components/Layout/Sidebar'
+
+const StudentDashboard = () => {
+  const [profile, setProfile] = useState(null)
+  const [recentCalculations, setRecentCalculations] = useState([])
+  const { user, setLoading } = useAuth()
+  const [darkMode, setDarkMode] = useState(false)
+
+  useEffect(() => {
+    fetchDashboardData()
+  }, [])
+
+  const fetchDashboardData = async () => {
+    setLoading(true)
+    try {
+      const [profileRes, historyRes] = await Promise.all([
+        studentAPI.getProfile(),
+        studentAPI.getHistory()
+      ])
+      setProfile(profileRes.data)
+      setRecentCalculations(historyRes.data.slice(0, 5))
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const quickActions = [
+    {
+      title: 'GPA Calculator',
+      description: 'Calculate your semester GPA',
+      icon: Calculator,
+      link: '/gpa',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'CGPA Calculator',
+      description: 'Calculate your overall CGPA',
+      icon: BarChart3,
+      link: '/cgpa',
+      color: 'bg-green-500'
+    },
+    {
+      title: 'History',
+      description: 'View your calculation history',
+      icon: HistoryIcon,
+      link: '/history',
+      color: 'bg-purple-500'
+    }
+  ]
+
+  return (
+    <div className={`min-h-screen ${darkMode ? 'dark' : ''}`}>
+      <Header darkMode={darkMode} setDarkMode={setDarkMode} />
+      
+      <div className="flex">
+        <Sidebar />
+        
+        <main className="flex-1 p-8">
+          <div className="max-w-7xl mx-auto">
+            {/* Welcome Section */}
+            <div className="mb-8">
+              <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+                Welcome back, {user?.name}!
+              </h1>
+              <p className="text-gray-600 dark:text-gray-400 mt-2">
+                Track and calculate your academic performance
+              </p>
+            </div>
+
+            {/* Profile Summary */}
+            {profile && (
+              <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 mb-8">
+                <div className="flex items-center space-x-4">
+                  <div className="w-16 h-16 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                    <User className="w-8 h-8 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                      {profile.name}
+                    </h2>
+                    <p className="text-gray-600 dark:text-gray-400">
+                      {profile.department?.name} • {profile.regulation?.name}
+                    </p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      {profile.email}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Quick Actions */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              {quickActions.map((action) => {
+                const Icon = action.icon
+                return (
+                  <Link
+                    key={action.title}
+                    to={action.link}
+                    className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 p-6 hover:shadow-md transition-shadow"
+                  >
+                    <div className="flex items-center space-x-4">
+                      <div className={`w-12 h-12 ${action.color} rounded-lg flex items-center justify-center`}>
+                        <Icon className="w-6 h-6 text-white" />
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                          {action.title}
+                        </h3>
+                        <p className="text-gray-600 dark:text-gray-400 text-sm">
+                          {action.description}
+                        </p>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              })}
+            </div>
+
+            {/* Recent Calculations */}
+            <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
+              <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                <h2 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  Recent Calculations
+                </h2>
+              </div>
+              <div className="p-6">
+                {recentCalculations.length > 0 ? (
+                  <div className="space-y-4">
+                    {recentCalculations.map((calculation, index) => (
+                      <div
+                        key={index}
+                        className="flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700 last:border-0"
+                      >
+                        <div>
+                          <p className="font-medium text-gray-900 dark:text-white">
+                            Semester {calculation.semester} - {calculation.type}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {new Date(calculation.createdAt).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-lg font-bold text-blue-600 dark:text-blue-400">
+                            {calculation.result.toFixed(2)}
+                          </p>
+                          <p className="text-sm text-gray-600 dark:text-gray-400">
+                            {calculation.type}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-gray-500 dark:text-gray-400 text-center py-8">
+                    No calculations yet. Start by calculating your GPA!
+                  </p>
+                )}
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+  )
+}
+
+export default StudentDashboard"."#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+.logo {
+  height: 6em;
+  padding: 1.5em;
+  will-change: filter;
+  transition: filter 300ms;
+}
+.logo:hover {
+  filter: drop-shadow(0 0 2em #646cffaa);
+}
+.logo.react:hover {
+  filter: drop-shadow(0 0 2em #61dafbaa);
+}
+
+@keyframes logo-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  a:nth-of-type(2) .logo {
+    animation: logo-spin infinite 20s linear;
+  }
+}
+
+.card {
+  padding: 2em;
+}
+
+.read-the-docs {
+  color: #888;
+} "."@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-color: #3b82f6;
+  --secondary-color: #1e40af;
+}
+
+.dark {
+  --bg-primary: #1f2937;
+  --bg-secondary: #374151;
+  --text-primary: #f9fafb;
+  --text-secondary: #e5e7eb;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.loading-spinner {
+  border: 4px solid #f3f3f3;
+  border-top: 4px solid #3498db;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 2s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}"<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>gpa-calculator-frontend</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
+  </body>
+</html> "
