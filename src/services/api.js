@@ -1,7 +1,10 @@
 // src/services/api.js
 import axios from "axios";
 
-const API_BASE_URL = "http://localhost:8081/api";
+// ========================
+// PRODUCTION BACKEND URL
+// ========================
+const API_BASE_URL = "https://gpa-cgpacalc-1.onrender.com/api";
 
 // ========================
 // AXIOS INSTANCE
@@ -56,23 +59,22 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (data) => api.post("/auth/login", data),
 
-  // ✅ FIXED REGISTER (correct field names)
-register: (formData) =>
-  api.post("/auth/register", {
-    name: formData.name,
-    email: formData.email,
-    password: formData.password,
-    regulationId: Number(formData.regulation),
-    departmentId: Number(formData.department),
-  }),
+  // Register
+  register: (formData) =>
+    api.post("/auth/register", {
+      name: formData.name,
+      email: formData.email,
+      password: formData.password,
+      regulationId: Number(formData.regulation),
+      departmentId: Number(formData.department),
+    }),
 
-verifyOtp: (email, otp) => api.post("/auth/verify-otp", { email, otp }),
-resendOtp: (email) => api.post("/auth/resend-otp", { email }),
-// PUBLIC API for Register Page
-getPublicRegulations: () => api.get("/auth/public-regulations"),
-getPublicDepartments: () => api.get("/auth/public-departments"),
+  verifyOtp: (email, otp) => api.post("/auth/verify-otp", { email, otp }),
+  resendOtp: (email) => api.post("/auth/resend-otp", { email }),
 
-
+  // PUBLIC API
+  getPublicRegulations: () => api.get("/auth/public-regulations"),
+  getPublicDepartments: () => api.get("/auth/public-departments"),
 };
 
 // ========================
@@ -205,19 +207,14 @@ export const adminAPI = {
       { responseType: "blob" }
     ),
 
-  // Reports (NEW)
+  // Reports
   getReports: () => api.get("/admin/reports"),
   downloadReport: (id) =>
     api.get(`/admin/reports/${id}`, { responseType: "blob" }),
 
-  // Bulk import endpoints (NEW)
+  // Bulk import
   bulkImportSubjects: (payload) => api.post("/admin/import/subjects", payload),
-  bulkImportSemesters: (payload) => api.post("/admin/import/semesters", payload),
-
-  bulkImportSemesters: (rows) =>
-  api.post("/admin/import/semesters", rows),
-
+  bulkImportSemesters: (rows) => api.post("/admin/import/semesters", rows),
 };
-
 
 export default api;
